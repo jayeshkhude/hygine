@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo, memo } from 'react'
 import dynamic from 'next/dynamic'
 import { Report } from '../types'
 import { RISK_CONFIGS, getCategoryIcon, getCategoryLabel } from '../utils/riskCalculation'
@@ -15,57 +15,49 @@ interface RiskMapProps {
   data: Report[]
 }
 
-export function RiskMap({ data }: RiskMapProps) {
+export const RiskMap = memo(function RiskMap({ data }: RiskMapProps) {
   const [isClient, setIsClient] = useState(false)
+  const [mapType, setMapType] = useState<'satellite' | 'street'>('satellite')
 
   useEffect(() => {
     setIsClient(true)
   }, [])
 
-  if (!isClient) {
-    return (
-      <div className="h-96 bg-gray-100 rounded-lg flex items-center justify-center">
-        <p className="text-muted">Loading map...</p>
-      </div>
+  // Memoize filtered data to avoid recalculation
+  const validData = useMemo(() => {
+    return data.filter(item => 
+      item.lat !== undefined && item.lng !== undefined &&
+      !isNaN(item.lat) && !isNaN(item.lng) &&
+      item.lat >= -90 && item.lat <= 90 &&
+      item.lng >= -180 && item.lng <= 180
     )
-  }
+  }, [data])
 
-  // Filter out items without valid coordinates
-  const validData = data.filter(item => 
-    item.lat !== undefined && item.lng !== undefined &&
-    !isNaN(item.lat) && !isNaN(item.lng) &&
-    item.lat >= -90 && item.lat <= 90 &&
-    item.lng >= -180 && item.lng <= 180
-  )
+  // Memoize center calculation
+  const center = useMemo(() => {
+    if (validData.length === 0) return { lat: 0, lng: 0 }
+    return {
+      lat: validData.reduce((sum, item) => sum + (item.lat || 0), 0) / validData.length,
+      lng: validData.reduce((sum, item) => sum + (item.lng || 0), 0) / validData.length
+    }
+  }, [validData])
 
-  if (validData.length === 0) {
-    return (
-      <div className="h-96 bg-gray-100 rounded-lg flex items-center justify-center">
-        <p className="text-muted">No valid location data to display on map</p>
-      </div>
-    )
-  }
-
-  // Calculate center from actual coordinates
-  const center = {
-    lat: validData.reduce((sum, item) => sum + (item.lat || 0), 0) / validData.length,
-    lng: validData.reduce((sum, item) => sum + (item.lng || 0), 0) / validData.length
-  }
-
-  // Group data by risk level for better visual hierarchy
-  const groupedData = {
+  // Memoize grouped data
+  const groupedData = useMemo(() => ({
     high: validData.filter(item => item.risk === 'high'),
     medium: validData.filter(item => item.risk === 'medium'),
     low: validData.filter(item => item.risk === 'low')
-  }
+  }), [validData])
   
-  // Calculate appropriate zoom level based on data spread
-  const calculateZoom = () => {
+  // Memoize zoom calculation
+  const zoom = useMemo(() => {
     if (validData.length === 0) return 12
     if (validData.length === 1) return 15
     
     const lats = validData.map(item => item.lat!).filter(lat => lat !== undefined)
     const lngs = validData.map(item => item.lng!).filter(lng => lng !== undefined)
+    
+    if (lats.length === 0 || lngs.length === 0) return 12
     
     const latRange = Math.max(...lats) - Math.min(...lats)
     const lngRange = Math.max(...lngs) - Math.min(...lngs)
@@ -79,20 +71,45 @@ export function RiskMap({ data }: RiskMapProps) {
     if (maxRange > 0.5) return 12
     if (maxRange > 0.1) return 13
     return 14
+  }, [validData])
+
+  if (!isClient) {
+    return (
+      <div className="h-96 bg-gray-100 rounded-lg flex items-center justify-center">
+        <p className="text-muted">Loading map...</p>
+      </div>
+    )
+  }
+
+  if (validData.length === 0) {
+    return (
+      <div className="h-96 bg-gray-100 rounded-lg flex items-center justify-center">
+        <p className="text-muted">No valid location data to display on map</p>
+      </div>
+    )
   }
 
   return (
     <div className="h-96 w-full relative">
       <MapContainer
         center={[center.lat, center.lng]}
-        zoom={calculateZoom()}
+        zoom={zoom}
         style={{ height: '100%', width: '100%' }}
         className="rounded-lg"
+        key={`map-${mapType}`} // Force re-render when map type changes
       >
-        <TileLayer
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        />
+        {/* Map Layer - Satellite or Street */}
+        {mapType === 'satellite' ? (
+          <TileLayer
+            url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+            attribution='&copy; <a href="https://www.esri.com/">Esri</a> &mdash; Source: Esri, Maxar, GeoEye, Earthstar Geographics, CNES/Airbus DS, USDA, USGS, AeroGRID, IGN, and the GIS User Community'
+          />
+        ) : (
+          <TileLayer
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          />
+        )}
         
         {/* Render markers by risk level for better visual hierarchy */}
         {Object.entries(groupedData).map(([riskLevel, items]) => (
@@ -157,6 +174,30 @@ export function RiskMap({ data }: RiskMapProps) {
         ))}
       </MapContainer>
 
+      {/* Map Type Switcher */}
+      <div className="absolute top-4 left-4 bg-white p-2 rounded-lg shadow-lg border border-gray-200 z-[1000] flex gap-2">
+        <button
+          onClick={() => setMapType('satellite')}
+          className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+            mapType === 'satellite'
+              ? 'bg-primary text-white'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          }`}
+        >
+          🛰️ Satellite
+        </button>
+        <button
+          onClick={() => setMapType('street')}
+          className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+            mapType === 'street'
+              ? 'bg-primary text-white'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          }`}
+        >
+          🗺️ Street
+        </button>
+      </div>
+
       {/* Enhanced Legend */}
       <div className="absolute top-4 right-4 bg-white p-4 rounded-lg shadow-lg border border-gray-200 z-[1000] max-w-48">
         <h4 className="font-semibold text-sm text-gray-800 mb-3">Risk Level Legend</h4>
@@ -200,7 +241,7 @@ export function RiskMap({ data }: RiskMapProps) {
       </div>
     </div>
   )
-}
+})
 
 // Add Leaflet CSS
 if (typeof window !== 'undefined') {

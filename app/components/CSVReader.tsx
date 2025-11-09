@@ -159,8 +159,8 @@ export function CSVReader({ onDataUpload }: CSVReaderProps) {
         </h4>
         <div className="text-xs font-mono bg-white p-2 rounded border">
           text,location,date<br />
-          "Garbage overflow in Central Park","Central Park, NYC","2024-01-15"<br />
-          "Bad smell from drain","Broadway St, NYC","2024-01-16"
+          &quot;Garbage overflow in Central Park&quot;,&quot;Central Park, NYC&quot;,&quot;2024-01-15&quot;<br />
+          &quot;Bad smell from drain&quot;,&quot;Broadway St, NYC&quot;,&quot;2024-01-16&quot;
         </div>
       </div>
     </div>

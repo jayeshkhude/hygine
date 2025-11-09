@@ -63,16 +63,22 @@ export default function Home() {
     
     try {
       // Geocode all locations sequentially to respect rate limits
-      const geocodedResults: Array<{ lat: number; lng: number } | null> = []
+      const geocodedResults: Array<{ lat: number; lng: number; location: string } | null> = []
+      const totalLocations = csvData.filter(row => row.location && row.location.trim()).length
+      let processedCount = 0
       
       for (const row of csvData) {
         const location = row.location || ''
-        if (!location) {
+        if (!location || !location.trim()) {
           geocodedResults.push(null)
           continue
         }
         
         try {
+          // Show progress in console
+          processedCount++
+          console.log(`Geocoding ${processedCount}/${totalLocations}: ${location}`)
+          
           const response = await fetch('/api/geocode', {
             method: 'POST',
             headers: {
@@ -85,22 +91,36 @@ export default function Home() {
             const geocoded = await response.json()
             geocodedResults.push({
               lat: geocoded.lat,
-              lng: geocoded.lng
+              lng: geocoded.lng,
+              location: location
             })
+            console.log(`✓ Successfully geocoded: ${location} -> ${geocoded.lat}, ${geocoded.lng}`)
           } else {
-            console.warn('Failed to geocode location:', location)
+            const errorData = await response.json().catch(() => ({}))
+            console.warn(`✗ Failed to geocode: ${location} - ${errorData.error || 'Unknown error'}`)
             geocodedResults.push(null)
           }
         } catch (error) {
-          console.error('Geocoding error for location:', location, error)
+          console.error(`✗ Geocoding error for "${location}":`, error)
           geocodedResults.push(null)
         }
         
-        // Add delay between requests (1.1 seconds) to respect rate limits
+        // Add delay between requests (1.2 seconds) to respect rate limits
         // Don't delay after the last request
-        if (geocodedResults.length < csvData.length) {
-          await new Promise(resolve => setTimeout(resolve, 1100))
+        if (processedCount < totalLocations) {
+          await new Promise(resolve => setTimeout(resolve, 1200))
         }
+      }
+      
+      const successCount = geocodedResults.filter(r => r !== null).length
+      console.log(`\n📊 Geocoding Summary: ${successCount}/${totalLocations} locations successfully geocoded`)
+      
+      if (successCount < totalLocations) {
+        const failedLocations = csvData
+          .map((row, idx) => ({ location: row.location, idx }))
+          .filter((_, idx) => geocodedResults[idx] === null)
+          .map(item => item.location)
+        console.warn('Failed locations:', failedLocations)
       }
       
       // Convert CSV data to the new Report format with geocoded coordinates
@@ -111,14 +131,17 @@ export default function Home() {
         const geocoded = geocodedResults[i]
         
         // Only include reports that were successfully geocoded
-        if (!geocoded) continue
+        if (!geocoded) {
+          console.warn(`Skipping row ${i + 1}: Failed to geocode "${row.location}"`)
+          continue
+        }
         
         processedData.push({
           id: crypto.randomUUID(),
           userId: 'csv_import',
           createdAt: new Date().toISOString(),
           date: row.date || new Date().toISOString().split('T')[0],
-          locationText: row.location || '',
+          locationText: row.location || geocoded.location || '',
           lat: geocoded.lat,
           lng: geocoded.lng,
           category: 'garbage' as const, // Default category
@@ -129,6 +152,8 @@ export default function Home() {
           status: 'active' as const
         })
       }
+      
+      console.log(`✅ Processed ${processedData.length} reports from CSV`)
       
       setData(processedData)
       setFilteredData(processedData)

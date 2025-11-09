@@ -1,58 +1,140 @@
 /**
- * Geocoding utility using OpenStreetMap Nominatim API
+ * Enhanced Geocoding utility using OpenStreetMap Nominatim API
  * Free, no API key required, but has rate limiting (1 request per second)
+ * Includes retry logic and multiple query formats for better accuracy
  */
 
 export interface GeocodeResult {
   lat: number
   lng: number
   displayName: string
+  confidence?: number
 }
 
 /**
- * Geocode a location string to coordinates
+ * Generate multiple query variations for better geocoding accuracy
+ */
+function generateQueryVariations(locationText: string): string[] {
+  const trimmed = locationText.trim()
+  const variations: string[] = [trimmed]
+  
+  // Add variations with different formats
+  if (trimmed.includes(',')) {
+    const parts = trimmed.split(',').map(p => p.trim())
+    // Original
+    variations.push(trimmed)
+    // Reversed (city, country -> country, city)
+    if (parts.length === 2) {
+      variations.push(`${parts[1]}, ${parts[0]}`)
+    }
+    // Just the first part (city name)
+    variations.push(parts[0])
+    // Just the last part (country/state)
+    if (parts.length > 1) {
+      variations.push(parts[parts.length - 1])
+    }
+  } else {
+    // If no comma, try adding common suffixes
+    variations.push(`${trimmed}, India`)
+    variations.push(`${trimmed}, USA`)
+  }
+  
+  // Remove duplicates and return
+  return Array.from(new Set(variations))
+}
+
+/**
+ * Geocode a location string to coordinates with retry logic
  * @param locationText - Location description (e.g., "Pune, India" or "Central Park, NYC")
+ * @param retries - Number of retry attempts with different query formats
  * @returns Promise with coordinates or null if geocoding fails
  */
-export async function geocodeLocation(locationText: string): Promise<GeocodeResult | null> {
+export async function geocodeLocation(
+  locationText: string,
+  retries: number = 3
+): Promise<GeocodeResult | null> {
   if (!locationText || locationText.trim().length === 0) {
     return null
   }
 
-  try {
-    // Use Nominatim API (OpenStreetMap's geocoding service)
-    // Rate limit: 1 request per second (we'll handle this on the client/server)
-    const encodedLocation = encodeURIComponent(locationText.trim())
-    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodedLocation}&limit=1&addressdetails=1`
+  const queryVariations = generateQueryVariations(locationText)
+  
+  // Try each variation
+  for (const query of queryVariations) {
+    for (let attempt = 0; attempt < retries; attempt++) {
+      try {
+        const encodedLocation = encodeURIComponent(query)
+        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodedLocation}&limit=5&addressdetails=1&extratags=1`
 
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'CityHygieneRiskMonitor/1.0' // Required by Nominatim
+        const response = await fetch(url, {
+          headers: {
+            'User-Agent': 'CityHygieneRiskMonitor/1.0',
+            'Accept-Language': 'en'
+          }
+        })
+
+        if (!response.ok) {
+          if (response.status === 429) {
+            // Rate limited - wait longer
+            await new Promise(resolve => setTimeout(resolve, 2000))
+            continue
+          }
+          continue
+        }
+
+        const data = await response.json()
+
+        if (!data || data.length === 0) {
+          continue
+        }
+
+        // Find the best match (prefer exact matches, then most relevant)
+        let bestMatch = data[0]
+        
+        // Score results by relevance
+        for (const result of data) {
+          const importance = result.importance || 0
+          const matchScore = result.importance || 0
+          
+          // Prefer results with higher importance and better match
+          if (matchScore > (bestMatch.importance || 0)) {
+            bestMatch = result
+          }
+          
+          // If we find an exact match in display_name, use it
+          if (result.display_name?.toLowerCase().includes(locationText.toLowerCase().split(',')[0].toLowerCase())) {
+            bestMatch = result
+            break
+          }
+        }
+
+        // Validate coordinates
+        const lat = parseFloat(bestMatch.lat)
+        const lng = parseFloat(bestMatch.lon)
+        
+        if (isNaN(lat)) return null
+        if (isNaN(lng)) return null
+        if (lat < -90 || lat > 90) return null
+        if (lng < -180 || lng > 180) return null
+
+        return {
+          lat,
+          lng,
+          displayName: bestMatch.display_name || locationText,
+          confidence: bestMatch.importance || 0.5
+        }
+      } catch (error) {
+        console.warn(`Geocoding attempt ${attempt + 1} failed for "${query}":`, error)
+        // Wait before retry
+        if (attempt < retries - 1) {
+          await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)))
+        }
       }
-    })
-
-    if (!response.ok) {
-      console.error('Geocoding API error:', response.statusText)
-      return null
     }
-
-    const data = await response.json()
-
-    if (!data || data.length === 0) {
-      console.warn('No geocoding results for:', locationText)
-      return null
-    }
-
-    const result = data[0]
-    return {
-      lat: parseFloat(result.lat),
-      lng: parseFloat(result.lon),
-      displayName: result.display_name || locationText
-    }
-  } catch (error) {
-    console.error('Geocoding error:', error)
-    return null
   }
+
+  console.warn('All geocoding attempts failed for:', locationText)
+  return null
 }
 
 /**
