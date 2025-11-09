@@ -1,0 +1,35 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-white rounded-xl shadow-lg border border-border p-6 mb-6;
+  }
+  
+  .divider {
+    @apply h-0.5 bg-gradient-to-r from-primary to-muted rounded-full my-8 opacity-60;
+  }
+  
+  .summary-title {
+    @apply text-sm font-semibold text-muted mb-2 tracking-wide;
+  }
+  
+  .summary-value {
+    @apply text-4xl font-bold text-primary tracking-wider;
+  }
+  
+  .main-title {
+    @apply text-center text-5xl font-extrabold text-primary tracking-widest mb-2;
+  }
+  
+  .subtitle {
+    @apply text-center text-xl text-muted font-normal mb-2 tracking-wide;
+  }
+} 
