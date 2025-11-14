@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Upload, MapPin, AlertTriangle, Calendar, BarChart3, Home as HomeIcon } from 'lucide-react'
+import { Upload, MapPin, AlertTriangle, Calendar, BarChart3, Home as HomeIcon, Shield } from 'lucide-react'
 import { PollutionMap } from './components/RiskMap'
 import { SummaryCards } from './components/SummaryCards'
 import { Charts } from './components/Charts'
@@ -95,7 +95,21 @@ export default function Home() {
               </div>
             </div>
             
-            {/* Mobile Menu Button */}
+            <button
+              onClick={() => {
+                const pwd = window.prompt('Enter admin password')
+                if (pwd === 'pollution') {
+                  localStorage.setItem('admin_auth', 'ok')
+                  window.location.href = '/admin'
+                } else if (pwd) {
+                  alert('Incorrect password')
+                }
+              }}
+              className="border-2 border-primary text-primary px-4 py-2 rounded-lg font-semibold hover:bg-primary hover:text-white transition-colors flex items-center gap-2"
+              title="Admin"
+            >
+              <Shield className="h-4 w-4" /> Admin
+            </button>
           </div>
         </div>
       </header>
@@ -171,4 +185,4 @@ export default function Home() {
       />
     </div>
   )
-} 
+}
