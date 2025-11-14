@@ -60,8 +60,31 @@ class InMemoryStore {
   }
 }
 
-// Use in-memory store if Redis is not available
-const store = hasRedisConfig && redis ? redis : new InMemoryStore()
+// Create a minimal adapter so our code can call setex() consistently
+const store: {
+  setex: (key: string, ttlSeconds: number, value: string) => Promise<any>
+  get: (key: string) => Promise<any>
+  zadd: (key: string, data: { score: number; member: string }) => Promise<any>
+  zrange: (key: string, start: number, end: number) => Promise<string[]>
+  expire: (key: string, ttlSeconds: number) => Promise<any>
+  exists: (key: string) => Promise<number>
+  del: (key: string) => Promise<any>
+  zrem: (key: string, member: string) => Promise<any>
+} = hasRedisConfig && redis
+  ? {
+      setex: (key, ttl, value) => redis.set(key, value, { ex: ttl }),
+      get: async (key) => {
+        const v = await redis.get(key)
+        return typeof v === 'string' ? v : v != null ? JSON.stringify(v) : null
+      },
+      zadd: (key, data) => redis.zadd(key, data),
+      zrange: (key, start, end) => redis.zrange<string[]>(key, start, end),
+      expire: (key, ttl) => redis.expire(key, ttl),
+      exists: (key) => redis.exists(key) as Promise<number>,
+      del: (key) => redis.del(key),
+      zrem: (key, member) => redis.zrem(key, member),
+    }
+  : (new InMemoryStore() as any)
 
 export class ReportStore {
   private static readonly REPORT_PREFIX = 'report:'
