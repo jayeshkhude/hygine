@@ -1,5 +1,5 @@
 import { Redis } from '@upstash/redis'
-import { Report, ReportCategory, RiskLevel } from '../types'
+import { Report, ReportCategory } from '../types'
 
 // Check if Redis environment variables are available
 const hasRedisConfig = process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
@@ -70,7 +70,7 @@ export class ReportStore {
   private static readonly TTL_DAYS = 7
 
   // Create a new report
-  static async createReport(report: Omit<Report, 'id' | 'createdAt' | 'expiresAt' | 'status' | 'date'>): Promise<Report> {
+  static async createReport(report: Omit<Report, 'id' | 'createdAt' | 'expiresAt' | 'status' | 'date'> & { lat: number; lng: number }): Promise<Report> {
     const id = crypto.randomUUID()
     const createdAt = new Date().toISOString()
     const date = new Date().toISOString().split('T')[0] // Always use current date
@@ -189,7 +189,7 @@ export class ReportStore {
     
     // Recalculate expiry if category changed
     if (updates.category && updates.category !== existing.category) {
-      const { calculateExpiryDate } = await import('../utils/riskCalculation')
+      const { calculateExpiryDate } = await import('../utils/categoryConfig')
       updated.expiresAt = calculateExpiryDate(updated.createdAt, updates.category)
     }
 
@@ -205,9 +205,6 @@ export class ReportStore {
   // Get dashboard statistics
   static async getDashboardStats(): Promise<{
     totalReports: number
-    highRiskCount: number
-    mediumRiskCount: number
-    lowRiskCount: number
     categoryBreakdown: Record<ReportCategory, number>
     dailyTrend: Array<{ date: string; count: number }>
   }> {
@@ -215,12 +212,13 @@ export class ReportStore {
     
     const categoryBreakdown: Record<ReportCategory, number> = {
       garbage: 0,
-      dead_animal: 0,
+      pothole: 0,
+      road_damage: 0,
       sewage_overflow: 0,
-      toilet_unclean: 0,
-      mosquito_breeding: 0,
-      festival_waste: 0,
-      general_dirty: 0
+      air_pollution: 0,
+      water_pollution: 0,
+      noise_pollution: 0,
+      other: 0
     }
 
     const dailyCounts: Record<string, number> = {}
@@ -238,9 +236,6 @@ export class ReportStore {
 
     return {
       totalReports: reports.length,
-      highRiskCount: reports.filter(r => r.risk === 'high').length,
-      mediumRiskCount: reports.filter(r => r.risk === 'medium').length,
-      lowRiskCount: reports.filter(r => r.risk === 'low').length,
       categoryBreakdown,
       dailyTrend
     }
@@ -264,4 +259,4 @@ export class ReportStore {
   private static isExpired(report: Report): boolean {
     return new Date() > new Date(report.expiresAt)
   }
-} 
+}

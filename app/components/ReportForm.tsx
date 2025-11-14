@@ -1,68 +1,58 @@
 'use client'
 
-import { useState } from 'react'
-import { X, MapPin, Camera, AlertCircle } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { X, Camera } from 'lucide-react'
 import { ReportFormData, ReportCategory } from '../types'
-import { getCategoryIcon, getCategoryLabel, RISK_CONFIGS } from '../utils/riskCalculation'
+import { getCategoryIcon, getCategoryLabel, CATEGORY_CONFIGS } from '../utils/categoryConfig'
 
 interface ReportFormProps {
   isOpen: boolean
   onClose: () => void
   onSubmit: (data: ReportFormData) => Promise<void>
+  selectedLocation: { lat: number; lng: number } | null
 }
 
-export function ReportForm({ isOpen, onClose, onSubmit }: ReportFormProps) {
+export function ReportForm({ isOpen, onClose, onSubmit, selectedLocation }: ReportFormProps) {
   const [formData, setFormData] = useState<ReportFormData>({
-    locationText: '',
+    description: '',
+    lat: 0,
+    lng: 0,
     category: 'garbage',
     photoUrl: ''
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
-  const [isGeocoding, setIsGeocoding] = useState(false)
+
+  // Update coordinates when location is selected from map
+  useEffect(() => {
+    if (selectedLocation) {
+      setFormData(prev => ({
+        ...prev,
+        lat: selectedLocation.lat,
+        lng: selectedLocation.lng
+      }))
+    }
+  }, [selectedLocation])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    
-    let dataToSubmit = { ...formData }
 
-    // Geocode the location if coordinates are not provided
+    // Validate that location is selected
     if (!formData.lat || !formData.lng) {
-      setIsGeocoding(true)
-      try {
-        const response = await fetch('/api/geocode', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ locationText: formData.locationText }),
-        })
+      setError('Please select a location on the map first')
+      return
+    }
 
-        if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(errorData.error || 'Could not find location. Please provide a more specific address.')
-        }
-
-        const geocoded = await response.json()
-        dataToSubmit = {
-          ...formData,
-          lat: geocoded.lat,
-          lng: geocoded.lng
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to geocode location')
-        setIsGeocoding(false)
-        return
-      } finally {
-        setIsGeocoding(false)
-      }
+    if (!formData.description.trim()) {
+      setError('Please describe what you found at this location')
+      return
     }
 
     setIsSubmitting(true)
     try {
-      await onSubmit(dataToSubmit)
-      setFormData({ locationText: '', category: 'garbage', photoUrl: '' })
+      await onSubmit(formData)
+      setFormData({ description: '', lat: 0, lng: 0, category: 'garbage', photoUrl: '' })
       onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to submit report')
@@ -78,11 +68,11 @@ export function ReportForm({ isOpen, onClose, onSubmit }: ReportFormProps) {
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[1100] p-4">
       <div className="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">Report Hygiene Issue</h2>
+          <h2 className="text-xl font-semibold text-gray-900">Report Pollution Issue</h2>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 transition-colors"
@@ -92,13 +82,51 @@ export function ReportForm({ isOpen, onClose, onSubmit }: ReportFormProps) {
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          {/* Location Status */}
+          <div className={`p-4 rounded-lg border-2 ${
+            selectedLocation 
+              ? 'bg-green-50 border-green-200' 
+              : 'bg-yellow-50 border-yellow-200'
+          }`}>
+            {selectedLocation ? (
+              <div>
+                <p className="text-sm font-medium text-green-800 mb-1">✓ Location Selected</p>
+                <p className="text-xs text-green-600">
+                  {selectedLocation.lat.toFixed(6)}, {selectedLocation.lng.toFixed(6)}
+                </p>
+              </div>
+            ) : (
+              <p className="text-sm text-yellow-800">
+                ⚠ Please click on the map to select a location first
+              </p>
+            )}
+          </div>
+
+          {/* Description Input */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              What did you find at this location? *
+            </label>
+            <textarea
+              value={formData.description}
+              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+              placeholder="e.g., Large pile of garbage, Deep pothole, Road damage, Sewage overflow, etc."
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
+              rows={4}
+              required
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Describe what pollution or issue you found at the selected location
+            </p>
+          </div>
+
           {/* Category Selection */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-3">
-              Issue Category
+              Pollution Category
             </label>
             <div className="grid grid-cols-2 gap-3">
-              {Object.entries(RISK_CONFIGS).map(([category, config]) => (
+              {Object.entries(CATEGORY_CONFIGS).map(([category, config]) => (
                 <button
                   key={category}
                   type="button"
@@ -111,31 +139,8 @@ export function ReportForm({ isOpen, onClose, onSubmit }: ReportFormProps) {
                 >
                   <div className="text-2xl mb-1">{getCategoryIcon(category as ReportCategory)}</div>
                   <div className="text-xs font-medium">{getCategoryLabel(category as ReportCategory)}</div>
-                  <div className={`text-xs mt-1 ${
-                    formData.category === category ? 'text-white' : 'text-gray-500'
-                  }`}>
-                    {config.risk.toUpperCase()} Risk • {config.score}/10
-                  </div>
                 </button>
               ))}
-            </div>
-          </div>
-
-          {/* Location Input */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Location Description
-            </label>
-            <div className="relative">
-              <MapPin className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
-              <input
-                type="text"
-                value={formData.locationText}
-                onChange={(e) => setFormData(prev => ({ ...prev, locationText: e.target.value }))}
-                placeholder="e.g., Central Park near fountain, Broadway Street corner"
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                required
-              />
             </div>
           </div>
 
@@ -155,8 +160,6 @@ export function ReportForm({ isOpen, onClose, onSubmit }: ReportFormProps) {
                 onChange={(e) => {
                   const file = e.target.files?.[0]
                   if (file) {
-                    // In production, upload to Cloudinary/Supabase Storage
-                    // For demo, we'll just store the filename
                     setFormData(prev => ({ ...prev, photoUrl: file.name }))
                   }
                 }}
@@ -171,17 +174,11 @@ export function ReportForm({ isOpen, onClose, onSubmit }: ReportFormProps) {
             </div>
           </div>
 
-          {/* Risk Information */}
+          {/* Category Info */}
           <div className="bg-gray-50 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <AlertCircle className="h-5 w-5 text-orange-500" />
-              <span className="text-sm font-medium text-gray-700">Risk Assessment</span>
-            </div>
             <div className="text-sm text-gray-600">
               <p>Category: <span className="font-medium">{getCategoryLabel(formData.category)}</span></p>
-              <p>Risk Level: <span className="font-medium">{RISK_CONFIGS[formData.category].risk.toUpperCase()}</span></p>
-              <p>Risk Score: <span className="font-medium">{RISK_CONFIGS[formData.category].score}/10</span></p>
-              <p>Expires in: <span className="font-medium">{RISK_CONFIGS[formData.category].expiryDays} days</span></p>
+              <p>Expires in: <span className="font-medium">{CATEGORY_CONFIGS[formData.category].expiryDays} days</span></p>
             </div>
           </div>
 
@@ -195,13 +192,13 @@ export function ReportForm({ isOpen, onClose, onSubmit }: ReportFormProps) {
           {/* Submit Button */}
           <button
             type="submit"
-            disabled={isSubmitting || isGeocoding || !formData.locationText}
+            disabled={isSubmitting || !selectedLocation || !formData.description.trim()}
             className="w-full bg-primary text-white py-3 px-4 rounded-lg font-medium hover:bg-opacity-90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isGeocoding ? 'Finding location...' : isSubmitting ? 'Submitting...' : 'Submit Report'}
+            {isSubmitting ? 'Submitting...' : 'Submit Report'}
           </button>
         </form>
       </div>
     </div>
   )
-} 
+}

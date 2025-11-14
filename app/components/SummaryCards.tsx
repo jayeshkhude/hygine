@@ -9,14 +9,22 @@ interface SummaryCardsProps {
 
 export function SummaryCards({ data }: SummaryCardsProps) {
   const totalReports = data.length
-  const highRiskCount = data.filter(item => item.risk === 'high').length
-  const mediumRiskCount = data.filter(item => item.risk === 'medium').length
-  const lowRiskCount = data.filter(item => item.risk === 'low').length
+  
+  // Get category counts
+  const categoryCounts = data.reduce((acc, item) => {
+    acc[item.category] = (acc[item.category] || 0) + 1
+    return acc
+  }, {} as Record<string, number>)
   
   // Get latest report date
   const latestReport = data.length > 0 
     ? new Date(Math.max(...data.map(item => new Date(item.createdAt).getTime())))
     : null
+
+  // Get top categories
+  const topCategories = Object.entries(categoryCounts)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 3)
 
   const cards = [
     {
@@ -24,29 +32,15 @@ export function SummaryCards({ data }: SummaryCardsProps) {
       value: totalReports,
       icon: <MapPin className="h-6 w-6" />,
       color: 'bg-blue-500',
-      description: 'Active hygiene reports'
+      description: 'Active pollution reports'
     },
-    {
-      title: 'High Risk',
-      value: highRiskCount,
+    ...topCategories.map(([category, count], index) => ({
+      title: category.charAt(0).toUpperCase() + category.slice(1).replace('_', ' '),
+      value: count,
       icon: <AlertTriangle className="h-6 w-6" />,
-      color: 'bg-red-500',
-      description: 'Urgent attention needed'
-    },
-    {
-      title: 'Medium Risk',
-      value: mediumRiskCount,
-      icon: <AlertTriangle className="h-6 w-6" />,
-      color: 'bg-orange-500',
-      description: 'Moderate concerns'
-    },
-    {
-      title: 'Low Risk',
-      value: lowRiskCount,
-      icon: <AlertTriangle className="h-6 w-6" />,
-      color: 'bg-yellow-500',
-      description: 'Minor issues'
-    }
+      color: index === 0 ? 'bg-red-500' : index === 1 ? 'bg-orange-500' : 'bg-yellow-500',
+      description: 'Reports in this category'
+    }))
   ]
 
   return (

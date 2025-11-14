@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@react-google-maps/api": "^2.20.7",
     "@upstash/redis": "^1.35.3",
     "date-fns": "^2.30.0",
     "leaflet": "^1.9.4",

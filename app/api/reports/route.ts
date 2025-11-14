@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ReportStore } from '@/app/lib/redis'
-import { calculateRisk, calculateExpiryDate } from '@/app/utils/riskCalculation'
+import { calculateExpiryDate } from '@/app/utils/categoryConfig'
 import { ReportFormData, ReportCategory } from '@/app/types'
-import { geocodeLocation } from '@/app/utils/geocoding'
 
 // Rate limiting middleware
 function checkRateLimit(ip: string): boolean {
@@ -29,17 +28,25 @@ export async function POST(request: NextRequest) {
     const body: ReportFormData = await request.json()
     
     // Validation
-    if (!body.locationText || !body.category) {
+    if (!body.description || !body.category) {
       return NextResponse.json(
-        { error: 'Missing required fields: locationText and category' },
+        { error: 'Missing required fields: description and category' },
+        { status: 400 }
+      )
+    }
+
+    // Coordinates are required (must be selected from map)
+    if (body.lat === undefined || body.lng === undefined) {
+      return NextResponse.json(
+        { error: 'Missing coordinates. Please select a location on the map.' },
         { status: 400 }
       )
     }
 
     // Validate category
     const validCategories: ReportCategory[] = [
-      'garbage', 'dead_animal', 'sewage_overflow', 'toilet_unclean',
-      'mosquito_breeding', 'festival_waste', 'general_dirty'
+      'garbage', 'pothole', 'road_damage', 'sewage_overflow',
+      'air_pollution', 'water_pollution', 'noise_pollution', 'other'
     ]
     
     if (!validCategories.includes(body.category)) {
@@ -49,15 +56,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validate coordinates if provided
-    if (body.lat !== undefined && (body.lat < -90 || body.lat > 90)) {
+    // Validate coordinates
+    if (body.lat < -90 || body.lat > 90) {
       return NextResponse.json(
         { error: 'Invalid latitude' },
         { status: 400 }
       )
     }
     
-    if (body.lng !== undefined && (body.lng < -180 || body.lng > 180)) {
+    if (body.lng < -180 || body.lng > 180) {
       return NextResponse.json(
         { error: 'Invalid longitude' },
         { status: 400 }
@@ -77,38 +84,17 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Geocode location if coordinates are not provided
-    let lat = body.lat
-    let lng = body.lng
-    
-    if (lat === undefined || lng === undefined) {
-      const geocoded = await geocodeLocation(body.locationText)
-      if (geocoded) {
-        lat = geocoded.lat
-        lng = geocoded.lng
-      } else {
-        // If geocoding fails, return an error
-        return NextResponse.json(
-          { error: 'Could not determine location coordinates. Please provide a more specific address or use the map to select a location.' },
-          { status: 400 }
-        )
-      }
-    }
-
-    // Calculate risk and expiry
-    const riskConfig = calculateRisk(body.category)
+    // Calculate expiry date
     const createdAt = new Date().toISOString()
     const expiresAt = calculateExpiryDate(createdAt, body.category)
 
     // Create report
     const report = await ReportStore.createReport({
       userId: mockUserId,
-      locationText: body.locationText,
-      lat: lat,
-      lng: lng,
+      description: body.description,
+      lat: body.lat,
+      lng: body.lng,
       category: body.category,
-      risk: riskConfig.risk,
-      riskScore: riskConfig.score,
       photoUrl: body.photoUrl
     })
 
@@ -141,10 +127,6 @@ export async function GET(request: NextRequest) {
     // Apply filters
     if (category) {
       reports = reports.filter(r => r.category === category)
-    }
-    
-    if (risk) {
-      reports = reports.filter(r => r.risk === risk)
     }
     
     // Apply bounding box filter if provided

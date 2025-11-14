@@ -13,18 +13,18 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
   const steps = [
     {
       icon: <MapPin className="h-8 w-8" />,
-      title: "Report Hygiene Issues",
-      description: "Submit reports about garbage, sewage, or other hygiene problems in your area"
+      title: "Report Pollution Issues",
+      description: "Click on the map to select a location and report pollution problems like garbage, potholes, road damage, and more"
     },
     {
       icon: <AlertTriangle className="h-8 w-8" />,
-      title: "Real-time Risk Assessment",
-      description: "Get instant risk level classification and priority scoring for each issue"
+      title: "Easy Location Selection",
+      description: "Simply click anywhere on the map to pinpoint the exact location of the pollution issue"
     },
     {
       icon: <BarChart3 className="h-8 w-8" />,
       title: "Track & Monitor",
-      description: "View trends, analyze data, and monitor city-wide hygiene improvements"
+      description: "View trends, analyze data, and monitor city-wide pollution issues"
     }
   ]
 
@@ -34,11 +34,11 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
       <div className="container mx-auto px-6 py-20 text-center">
         <div className="max-w-4xl mx-auto">
           <h1 className="text-6xl font-extrabold text-primary mb-6 tracking-tight">
-            City Hygiene
+            City Pollution Monitor
             <span className="block text-4xl text-muted mt-2">Risk Monitor</span>
           </h1>
           <p className="text-xl text-muted mb-8 max-w-2xl mx-auto leading-relaxed">
-            A comprehensive platform for monitoring, reporting, and tracking hygiene risks across the city. 
+            A simple platform for reporting and tracking pollution issues across the city. Click on the map to report problems. 
             Help keep your community clean and safe.
           </p>
           
@@ -87,7 +87,7 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-foreground mb-2">Submit a Report</h3>
-                <p className="text-muted">Use the floating action button or map interface to report hygiene issues. Include location details and optional photos.</p>
+                <p className="text-muted">Click anywhere on the map to select a location, then describe what pollution issue you found (garbage, pothole, road damage, etc.)</p>
               </div>
             </div>
             
@@ -107,7 +107,7 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-foreground mb-2">Real-time Monitoring</h3>
-                <p className="text-muted">Track all reports on the interactive map, view trends in charts, and monitor city-wide hygiene improvements.</p>
+                <p className="text-muted">Track all reports on the interactive map, view trends in charts, and monitor city-wide pollution issues.</p>
               </div>
             </div>
           </div>
@@ -152,7 +152,7 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
         <div className="bg-primary text-white rounded-2xl p-12 text-center max-w-4xl mx-auto">
           <h2 className="text-3xl font-bold mb-4">Ready to Make a Difference?</h2>
           <p className="text-xl mb-8 opacity-90">
-            Join thousands of citizens helping to maintain city hygiene standards
+            Join thousands of citizens helping to report and track pollution issues
           </p>
           <button
             onClick={onGetStarted}
@@ -166,7 +166,7 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
 
       {/* Footer */}
       <footer className="container mx-auto px-6 py-8 text-center text-muted border-t border-border">
-        <p>&copy; 2024 City Hygiene Risk Monitor. Made for cleaner cities.</p>
+        <p>&copy; 2024 City Pollution Monitor. Made for cleaner cities.</p>
       </footer>
     </div>
   )

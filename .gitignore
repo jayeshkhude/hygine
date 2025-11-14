@@ -43,3 +43,9 @@ next-env.d.ts
 # OS
 Thumbs.db
 
+# ML artifacts
+ml/artifacts/
+*.pkl
+# Optional: ignore CSV datasets if not needed
+# *.csv
+

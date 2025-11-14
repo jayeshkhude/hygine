@@ -11,12 +11,10 @@ export interface Report {
   userId: string
   createdAt: string
   date: string // YYYY-MM-DD format
-  locationText: string
-  lat?: number
-  lng?: number
+  description: string // What's at this location (e.g., "garbage", "pothole", "road damage")
+  lat: number // Required - selected from map
+  lng: number // Required - selected from map
   category: ReportCategory
-  risk: RiskLevel
-  riskScore: number
   expiresAt: string
   photoUrl?: string
   status: 'active' | 'expired'
@@ -24,19 +22,18 @@ export interface Report {
 
 export type ReportCategory = 
   | 'garbage'
-  | 'dead_animal'
+  | 'pothole'
+  | 'road_damage'
   | 'sewage_overflow'
-  | 'toilet_unclean'
-  | 'mosquito_breeding'
-  | 'festival_waste'
-  | 'general_dirty'
-
-export type RiskLevel = 'low' | 'medium' | 'high'
+  | 'air_pollution'
+  | 'water_pollution'
+  | 'noise_pollution'
+  | 'other'
 
 export interface ReportFormData {
-  locationText: string
-  lat?: number
-  lng?: number
+  description: string
+  lat: number
+  lng: number
   category: ReportCategory
   photoUrl?: string
 }
@@ -61,15 +58,11 @@ export interface ReportFilters {
   fromDate?: string
   toDate?: string
   category?: ReportCategory
-  risk?: RiskLevel
   bbox?: MapBounds
 }
 
 export interface DashboardStats {
   totalReports: number
-  highRiskCount: number
-  mediumRiskCount: number
-  lowRiskCount: number
   categoryBreakdown: Record<ReportCategory, number>
   dailyTrend: Array<{ date: string; count: number }>
 } 
