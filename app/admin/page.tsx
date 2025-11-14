@@ -36,8 +36,7 @@ export default function AdminPage() {
     const fetchReports = async () => {
       try {
         setLoading(true)
-        const today = new Date().toISOString().split('T')[0]
-        const res = await fetch(`/api/reports?from=1970-01-01&to=${today}`)
+        const res = await fetch(`/api/reports`)
         if (res.ok) {
           const json = await res.json()
           setData(json.reports || [])
