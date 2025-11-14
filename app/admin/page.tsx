@@ -36,7 +36,8 @@ export default function AdminPage() {
     const fetchReports = async () => {
       try {
         setLoading(true)
-        const res = await fetch('/api/reports')
+        const today = new Date().toISOString().split('T')[0]
+        const res = await fetch(`/api/reports?from=1970-01-01&to=${today}`)
         if (res.ok) {
           const json = await res.json()
           setData(json.reports || [])
@@ -89,7 +90,10 @@ export default function AdminPage() {
           </div>
 
           {data.length === 0 && !loading ? (
-            <div className="text-center py-12 text-muted">No reports found</div>
+            <div className="text-center py-12 text-muted">
+              No reports found
+              <div className="mt-2 text-xs">If you expect existing data, ensure <span className="font-mono">UPSTASH_REDIS_REST_URL</span> and <span className="font-mono">UPSTASH_REDIS_REST_TOKEN</span> are configured.</div>
+            </div>
           ) : (
             <>
               <SummaryCards data={data} />
